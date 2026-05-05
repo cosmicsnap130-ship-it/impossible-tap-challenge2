@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Pipe Twist: Pulse</title>
+
+  <!-- ✅ YouTube Playables SDK -->
+  <script src="https://www.gstatic.com/ytgame/sdk/ytgame.js"></script>
+  <!-- ✅ GameDistribution SDK — Correct version -->
+  <script src="https://html5.api.gamedistribution.com/main.min.js"></script>
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #121212;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #fff;
+      touch-action: none;
+    }
+    #gameCanvas { display: block; cursor: pointer; }
+    #scoreBar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    #scoreBar .label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #555;
+    }
+    #scoreBar .value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+    }
+    #progressWrap {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: #1e1e1e;
+      z-index: 11;
+    }
+    #progressBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00e5ff, #7c4dff);
+      transition: width 0.4s ease;
+      box-shadow: 0 0 8px #00e5ff88;
+    }
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(18, 18, 18, 0.92);
+      backdrop-filter: blur(6px);
+      pointer-events: all;
+      z-index: 20;
+      gap: 0;
+    }
+    .screen.hidden { display: none; }
+    .screen-title {
+      font-size: clamp(28px, 6vw, 52px);
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .screen-title span {
+      background: linear-gradient(135deg, #00e5ff, #7c4dff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .screen-sub {
+      font-size: 13px;
+      color: #555;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 40px;
+    }
+    .score-display { display: flex; gap: 40px; margin-bottom: 40px; }
+    .score-box { text-align: center; }
+    .score-box .s-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .score-box .s-value { font-size: clamp(32px, 7vw, 56px); font-weight: 900; line-height: 1; }
+    .score-box .s-value.neon { color: #00e5ff; text-shadow: 0 0 20px #00e5ff88; }
+    .score-box .s-value.hi  { color: #7c4dff; text-shadow: 0 0 20px #7c4dff88; }
+    .btn {
+      cursor: pointer;
+      border: none;
+      outline: none;
+      padding: 14px 48px;
+      border-radius: 50px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #00e5ff22, #7c4dff22);
+      border: 1px solid #7c4dff55;
+      color: #fff;
+      transition: all 0.2s;
+      pointer-events: all;
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, #00e5ff44, #7c4dff44);
+      border-color: #7c4dffaa;
+      box-shadow: 0 0 24px #7c4dff44;
+      transform: translateY(-2px);
+    }
+    .btn:active { transform: scale(0.97); }
+    .hint { margin-top: 20px; font-size: 12px; color: #333; letter-spacing: 1px; }
+    #newBest {
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: #ffd740;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px #ffd74088;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+    #dirIndicator {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #333;
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 10;
+      transition: color 0.3s;
+    }
+
+    /* ── Ad Overlay ── */
+    #adOverlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      display: none;
+    }
+    #adOverlay p {
+      font-size: 13px;
+      color: #555;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    #adSpinner {
+      width: 40px; height: 40px;
+      border: 3px solid #1e1e1e;
+      border-top-color: #00e5ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Continue Button (Reward Ad) ── */
+    .btn-continue {
+      margin-top: 12px;
+      background: linear-gradient(135deg, #ffd74022, #ff980022);
+      border: 1px solid #ffd74055;
+      color: #ffd740;
+      font-size: 13px;
+      padding: 10px 32px;
+    }
+    .btn-continue:hover {
+      background: linear-gradient(135deg, #ffd74044, #ff980044);
+      border-color: #ffd740aa;
+      box-shadow: 0 0 20px #ffd74044;
+    }
+  </style>
+</head>
+<body>
+
+<div id="progressWrap"><div id="progressBar"></div></div>
+
+<div id="scoreBar" style="display:none;">
+  <div>
+    <div class="label">Score</div>
+    <div class="value" id="scoreVal">0</div>
+  </div>
+  <div style="text-align:right">
+    <div class="label">Best</div>
+    <div class="value" id="bestVal">0</div>
+  </div>
+</div>
+
+<div id="dirIndicator">&#8635; Clockwise</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Ad Loading Overlay -->
+<div id="adOverlay">
+  <p>Loading Ad...</p>
+  <div id="adSpinner"></div>
+</div>
+
+<!-- START SCREEN -->
+<div class="screen" id="startScreen">
+  <div class="screen-title">Pipe Twist<br><span>Pulse</span></div>
+  <div class="screen-sub">One tap to survive</div>
+  <button class="btn" id="playBtn">Play</button>
+  <p class="hint">Tap / Click anywhere to flip direction</p>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen hidden" id="gameOverScreen">
+  <div class="screen-title" style="margin-bottom:8px;">Game<br><span>Over</span></div>
+  <div id="newBest" style="display:none;">⭐ New Best!</div>
+  <div class="score-display">
+    <div class="score-box">
+      <div class="s-label">Score</div>
+      <div class="s-value neon" id="finalScore">0</div>
+    </div>
+    <div class="score-box">
+      <div class="s-label">Best</div>
+      <div class="s-value hi" id="finalBest">0</div>
+    </div>
+  </div>
+  <button class="btn" id="restartBtn">Restart</button>
+  <!-- Reward Ad — Continue button (gives player second chance) -->
+  <button class="btn btn-continue" id="continueBtn">▶ Watch Ad to Continue</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  PIPE TWIST: PULSE — with GameDistribution + YouTube SDK
+// ════════════════════════════════════════════════════════════
+
+// ── GameDistribution SDK Init ────────────────────────────────
+// Replace YOUR_GAME_ID with actual ID from GameDistribution dashboard
+const GD_GAME_ID    = 'YOUR_GAME_ID';      // 👈 Yahan apna Game ID daalna
+const GD_PUBLISHER  = 'YOUR_PUBLISHER_ID'; // 👈 Yahan apna Publisher ID daalna
+
+let gdReady = false;
+let gdAdPlaying = false;
+
+function initGDSDK() {
+  // ✅ Correct API: window['GameDistribution'] — not gdsdk
+  if (typeof window['GameDistribution'] === 'undefined') {
+    console.warn('GD SDK not loaded');
+    return;
+  }
+
+  window['GameDistribution']('init', {
+    gameId:      GD_GAME_ID,
+    publisherId: GD_PUBLISHER,
+    advertisementSettings: { autoplay: false },
+    onEvent: function(event) {
+      switch(event.name) {
+
+        case 'SDK_READY':
+          gdReady = true;
+          console.log('GD SDK Ready ✅');
+          break;
+
+        case 'SDK_GAME_START':
+          // Ad khatam — game resume karo
+          gdAdPlaying = false;
+          audioEnabled = true;
+          showAdOverlay(false);
+          if (gameState === 'paused') gameState = 'playing';
+          break;
+
+        case 'SDK_GAME_PAUSE':
+          // Ad start hone wala hai — game pause karo
+          gdAdPlaying = true;
+          audioEnabled = false;
+          showAdOverlay(true);
+          if (gameState === 'playing') gameState = 'paused';
+          break;
+
+        case 'ADVERTISEMENT_FINISHED':
+        case 'ADVERTISEMENT_ERROR':
+          gdAdPlaying = false;
+          audioEnabled = true;
+          showAdOverlay(false);
+          revealGameOver();
+          break;
+
+        case 'ADVERTISEMENT_REWARDED':
+          giveSecondChance();
+          break;
+      }
+    }
+  });
+}
+
+// Ad overlay show/hide
+function showAdOverlay(show) {
+  document.getElementById('adOverlay').style.display = show ? 'flex' : 'none';
+}
+
+// Interstitial Ad — Game Over pe dikhao
+function showInterstitialAd() {
+  if (!gdReady || typeof window['GameDistribution'] === 'undefined') {
+    revealGameOver();
+    return;
+  }
+  showAdOverlay(true);
+  window['GameDistribution']('play', undefined, undefined, 'interstitial');
+}
+
+// Reward Ad — Continue button pe dikhao
+function showRewardAd() {
+  if (!gdReady || typeof window['GameDistribution'] === 'undefined') {
+    giveSecondChance();
+    return;
+  }
+  showAdOverlay(true);
+  window['GameDistribution']('play', undefined, undefined, 'rewarded');
+}
+
+// Reward milne ke baad — player continue kar sakta hai
+function giveSecondChance() {
+  gameOverScreen.classList.add('hidden');
+  scoreBar.style.display = 'flex';
+  // Ball ko reset karo safe position pe
+  angle      = -Math.PI / 2;
+  direction  = 1;
+  obstacles  = [];
+  particles  = [];
+  spawnTimer = 100;
+  gameState  = 'playing';
+  lastScoreTime = performance.now();
+}
+
+// Game Over screen actually dikhao
+function revealGameOver() {
+  gameOverScreen.classList.remove('hidden');
+  scoreBar.style.display = 'none';
+}
+
+// ── YouTube SDK ──────────────────────────────────────────────
+async function initYTSDK() {
+  if (typeof ytgame === 'undefined') return;
+  ytgame.game.firstFrameReady();
+  try {
+    const saved = await ytgame.game.loadData();
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.highScore) highScore = data.highScore;
+    }
+  } catch (e) {
+    highScore = parseInt(localStorage.getItem('pipePulseHi') || '0');
+  }
+  ytgame.game.gameReady();
+  ytgame.system.onPause(()  => { if (gameState === 'playing')  gameState = 'paused'; });
+  ytgame.system.onResume(() => { if (gameState === 'paused')   gameState = 'playing'; });
+  ytgame.system.onAudioEnabledChange(enabled => { audioEnabled = enabled; });
+}
+
+// ── Audio ────────────────────────────────────────────────────
+let audioEnabled = true;
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTapSound() {
+  if (!audioEnabled) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(260, ac.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.18, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.09);
+    osc.start(ac.currentTime); osc.stop(ac.currentTime + 0.09);
+  } catch(e) {}
+}
+function playScoreSound() {
+  if (!audioEnabled) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ac.currentTime);
+    gain.gain.setValueAtTime(0.08, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    osc.start(ac.currentTime); osc.stop(ac.currentTime + 0.12);
+  } catch(e) {}
+}
+function playLevelUpSound() {
+  if (!audioEnabled) return;
+  try {
+    const ac = getAudioCtx();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ac.createOscillator(), gain = ac.createGain();
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.type = 'sine';
+      const t = ac.currentTime + i * 0.10;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.start(t); osc.stop(t + 0.18);
+    });
+  } catch(e) {}
+}
+function playGameOverSound() {
+  if (!audioEnabled) return;
+  try {
+    const ac = getAudioCtx();
+    const bufSize = ac.sampleRate * 0.15;
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++)
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 3);
+    const noise = ac.createBufferSource(), noiseGain = ac.createGain();
+    noise.buffer = buf; noise.connect(noiseGain); noiseGain.connect(ac.destination);
+    noiseGain.gain.setValueAtTime(0.4, ac.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+    noise.start(ac.currentTime);
+    const osc = ac.createOscillator(), oscGain = ac.createGain();
+    osc.connect(oscGain); oscGain.connect(ac.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(55, ac.currentTime + 0.5);
+    oscGain.gain.setValueAtTime(0.2, ac.currentTime);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
+    osc.start(ac.currentTime); osc.stop(ac.currentTime + 0.5);
+  } catch(e) {}
+}
+function playNearMissSound() {
+  if (!audioEnabled) return;
+  try {
+    const ac = getAudioCtx();
+    const bufSize = ac.sampleRate * 0.12;
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++)
+      data[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufSize);
+    const src = ac.createBufferSource(), filter = ac.createBiquadFilter(), gain = ac.createGain();
+    src.buffer = buf;
+    filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 0.8;
+    src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(0.12, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    src.start(ac.currentTime);
+  } catch(e) {}
+}
+
+// ── Canvas & Game State ──────────────────────────────────────
+const canvas  = document.getElementById('gameCanvas');
+const ctx     = canvas.getContext('2d');
+const startScreen    = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const scoreBar       = document.getElementById('scoreBar');
+const scoreVal       = document.getElementById('scoreVal');
+const bestVal        = document.getElementById('bestVal');
+const finalScore     = document.getElementById('finalScore');
+const finalBest      = document.getElementById('finalBest');
+const newBestEl      = document.getElementById('newBest');
+const progressBar    = document.getElementById('progressBar');
+const dirIndicator   = document.getElementById('dirIndicator');
+const playBtn        = document.getElementById('playBtn');
+const restartBtn     = document.getElementById('restartBtn');
+const continueBtn    = document.getElementById('continueBtn');
+
+let W, H, CX, CY, PIPE_R, BALL_R, OBS_THICK;
+let gameState = 'start';
+let angle = 0, direction = 1;
+let baseSpeed = 0.025, speed = baseSpeed;
+let score = 0;
+let highScore = parseInt(localStorage.getItem('pipePulseHi') || '0');
+let lastScoreTime = 0;
+let obstacles = [], particles = [];
+let spawnTimer = 0, spawnInterval = 120;
+let speedTier = 0;
+let continueUsed = false; // sirf ek baar continue milega
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  CX = W/2; CY = H/2;
+  const minDim = Math.min(W, H);
+  PIPE_R    = minDim * 0.30;
+  BALL_R    = minDim * 0.032;
+  OBS_THICK = minDim * 0.055;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const COLOR_BG       = '#121212';
+const COLOR_PIPE     = '#1e1e1e';
+const COLOR_PIPE_RING= '#2a2a2a';
+const COLOR_BALL     = '#00e5ff';
+const COLOR_OBS      = '#ff1744';
+const COLOR_OBS_GLOW = '#ff174488';
+
+function spawnObstacle() {
+  const LEN_MIN = PIPE_R * 0.28, LEN_MAX = PIPE_R * 0.55;
+  const len = LEN_MIN + Math.random() * (LEN_MAX - LEN_MIN);
+  let obsAngle, tries = 0;
+  do {
+    obsAngle = Math.random() * Math.PI * 2;
+    tries++;
+    if (Math.abs(angleDiff(obsAngle, angle)) * PIPE_R < PIPE_R * 1.9) continue;
+    if (!obstacles.some(o => Math.abs(angleDiff(obsAngle, o.angle)) * PIPE_R < (len + o.len)/2 + PIPE_R * 0.35)) break;
+  } while (tries < 20);
+  obstacles.push({ angle: obsAngle, len, entered: false, cleared: false, alpha: 0, age: 0 });
+}
+
+function angleDiff(a, b) {
+  let d = a - b;
+  while (d >  Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+function ballPos() { return { x: CX + Math.cos(angle)*PIPE_R, y: CY + Math.sin(angle)*PIPE_R }; }
+function isInsideObs(obs) { return Math.abs(angleDiff(angle, obs.angle)) * PIPE_R < obs.len/2 + BALL_R; }
+
+function spawnParticles(x, y) {
+  for (let i = 0; i < 24; i++) {
+    const a = Math.random()*Math.PI*2, spd = 2 + Math.random()*5;
+    particles.push({ x, y, vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      life: 1, decay: 0.03+Math.random()*0.04, r: 2+Math.random()*4,
+      color: Math.random()<0.5 ? '#00e5ff' : '#ff1744' });
+  }
+}
+
+function updateSpeedTier() {
+  const newTier = Math.floor(score / 10);
+  if (newTier !== speedTier) {
+    speedTier = newTier;
+    baseSpeed = Math.min(0.025 + speedTier * 0.004, 0.062);
+    spawnInterval = Math.max(55, 120 - speedTier * 10);
+    playLevelUpSound();
+  }
+  progressBar.style.width = (score % 10) * 10 + '%';
+}
+
+function drawBg()   { ctx.fillStyle = COLOR_BG; ctx.fillRect(0,0,W,H); }
+function drawPipe() {
+  ctx.beginPath(); ctx.arc(CX,CY,PIPE_R,0,Math.PI*2);
+  ctx.strokeStyle='#0a0a0a'; ctx.lineWidth=OBS_THICK+10; ctx.stroke();
+  ctx.beginPath(); ctx.arc(CX,CY,PIPE_R,0,Math.PI*2);
+  ctx.strokeStyle=COLOR_PIPE; ctx.lineWidth=OBS_THICK; ctx.stroke();
+  ctx.beginPath(); ctx.arc(CX,CY,PIPE_R,0,Math.PI*2);
+  ctx.strokeStyle=COLOR_PIPE_RING; ctx.lineWidth=1.5; ctx.stroke();
+}
+function drawObstacles() {
+  for (const obs of obstacles) {
+    if (obs.alpha < 1) obs.alpha = Math.min(1, obs.alpha + 0.05);
+    const half = obs.len/2/PIPE_R, a1=obs.angle-half, a2=obs.angle+half;
+    ctx.save(); ctx.globalAlpha = obs.alpha;
+    ctx.beginPath(); ctx.arc(CX,CY,PIPE_R,a1,a2);
+    ctx.strokeStyle=COLOR_OBS_GLOW; ctx.lineWidth=OBS_THICK+8; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(CX,CY,PIPE_R,a1,a2);
+    ctx.strokeStyle=COLOR_OBS; ctx.lineWidth=OBS_THICK; ctx.lineCap='round'; ctx.stroke();
+    for (const ta of [a1,a2]) {
+      ctx.beginPath(); ctx.arc(CX+Math.cos(ta)*PIPE_R, CY+Math.sin(ta)*PIPE_R, OBS_THICK*0.3, 0, Math.PI*2);
+      ctx.fillStyle='#ff6d00'; ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+function drawBall() {
+  const bp = ballPos();
+  for (const g of [{r:BALL_R*3.5,a:0.06},{r:BALL_R*2.2,a:0.14},{r:BALL_R*1.5,a:0.28}]) {
+    ctx.beginPath(); ctx.arc(bp.x,bp.y,g.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(0,229,255,${g.a})`; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(bp.x,bp.y,BALL_R,0,Math.PI*2); ctx.fillStyle=COLOR_BALL; ctx.fill();
+  ctx.beginPath(); ctx.arc(bp.x-BALL_R*0.28,bp.y-BALL_R*0.28,BALL_R*0.38,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fill();
+  const ta=angle-direction*0.18;
+  ctx.beginPath(); ctx.arc(CX+Math.cos(ta)*PIPE_R,CY+Math.sin(ta)*PIPE_R,BALL_R*0.4,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,229,255,0.25)'; ctx.fill();
+}
+function drawParticles() {
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vx*=0.92; p.vy*=0.92; p.life-=p.decay;
+    if (p.life<=0) { particles.splice(i,1); continue; }
+    ctx.save(); ctx.globalAlpha=p.life;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fillStyle=p.color; ctx.fill();
+    ctx.restore();
+  }
+}
+
+let lastTime = 0;
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+  if (gameState === 'playing') {
+    if (ts - lastScoreTime >= 1000) {
+      score++; lastScoreTime = ts;
+      scoreVal.textContent = score;
+      playScoreSound(); updateSpeedTier();
+    }
+  }
+  drawBg(); drawPipe(); drawObstacles();
+  if (gameState === 'playing') {
+    angle += direction * speed;
+    spawnTimer--;
+    if (spawnTimer <= 0) { spawnObstacle(); spawnTimer = spawnInterval; }
+    for (let i=obstacles.length-1;i>=0;i--) {
+      const obs=obstacles[i], inside=isInsideObs(obs);
+      if (inside && !obs.cleared) { triggerGameOver(); return; }
+      if (inside) obs.entered = true;
+      obs.age++;
+      if (obs.entered && !inside) { obs.cleared=true; playNearMissSound(); }
+      if (obs.cleared) { obstacles.splice(i,1); continue; }
+      if (!obs.entered && !inside && obs.age > 300) obstacles.splice(i,1);
+    }
+    speed = baseSpeed;
+  }
+  drawBall(); drawParticles();
+  dirIndicator.textContent = direction===1 ? '↻ Clockwise' : '↺ Anti-clockwise';
+}
+
+function triggerGameOver() {
+  gameState = 'over';
+  const bp = ballPos();
+  spawnParticles(bp.x, bp.y);
+  playGameOverSound();
+
+  const isNew = score > highScore;
+  if (isNew) {
+    highScore = score;
+    localStorage.setItem('pipePulseHi', highScore);
+    if (typeof ytgame !== 'undefined') ytgame.game.saveData(JSON.stringify({ highScore }));
+  }
+  if (typeof ytgame !== 'undefined') ytgame.game.sendScore({ value: score });
+
+  finalScore.textContent = score;
+  finalBest.textContent  = highScore;
+  bestVal.textContent    = highScore;
+  newBestEl.style.display = isNew ? 'block' : 'none';
+
+  // Continue button — sirf ek baar dikhao
+  continueBtn.style.display = continueUsed ? 'none' : 'inline-block';
+
+  // ✅ GameDistribution — Interstitial Ad dikhao, phir Game Over screen
+  setTimeout(() => showInterstitialAd(), 600);
+}
+
+function startGame() {
+  angle=-Math.PI/2; direction=1; baseSpeed=0.025; speed=baseSpeed;
+  score=0; speedTier=0; obstacles=[]; particles=[];
+  spawnTimer=100; spawnInterval=120;
+  continueUsed = false;
+  lastScoreTime = performance.now();
+  scoreVal.textContent='0'; bestVal.textContent=highScore;
+  progressBar.style.width='0%';
+  startScreen.classList.add('hidden');
+  gameOverScreen.classList.add('hidden');
+  scoreBar.style.display='flex';
+  gameState='playing';
+
+  // ✅ GameDistribution — game shuru hone pe SDK ko batao
+  if (gdReady && typeof window['GameDistribution'] !== 'undefined') {
+    window['GameDistribution']('play');
+  }
+}
+
+function handleTap(e) {
+  e.preventDefault();
+  if (e.target.classList.contains('btn')) return;
+  if (gameState === 'playing') { direction *= -1; playTapSound(); }
+}
+
+canvas.addEventListener('click',      handleTap, { passive: false });
+canvas.addEventListener('touchstart', handleTap, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.code==='Space' && gameState==='playing') { e.preventDefault(); direction*=-1; playTapSound(); }
+});
+
+playBtn.addEventListener('click',     e => { e.stopPropagation(); startGame(); });
+restartBtn.addEventListener('click',  e => { e.stopPropagation(); startGame(); });
+
+// ✅ Continue Button — Reward Ad dikhao
+continueBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  continueUsed = true;
+  continueBtn.style.display = 'none';
+  showRewardAd(); // Ad dekho → second chance milegi
+});
+
+// ── Boot ─────────────────────────────────────────────────────
+initGDSDK();  // GameDistribution init
+initYTSDK().then(() => requestAnimationFrame(gameLoop)); // YouTube + game loop
+</script>
+</body>
+</html>
